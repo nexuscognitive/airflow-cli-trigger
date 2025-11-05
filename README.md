@@ -5,8 +5,8 @@ A powerful Python CLI tool to trigger and monitor the Airflow DAGs.
 
 - ✅ **Trigger Airflow DAGs** 
 - ✅ **Real-time joacb monitoring** with status updates and progress spinner
-- ✅ **Flexible authentication** with password from CLI, environment variable, or interactive prompt
-- ✅ **Configurable DAG properties** via CLI
+- ✅ **Flexible authentication** with password from CLI, YAML, environment variable, or interactive prompt
+- ✅ **Configurable DAG properties** via CLI and YAML
 
 ## Installation
 
@@ -35,6 +35,7 @@ pip install -r requirements.txt
 certifi==2025.10.5
 charset-normalizer==3.4.4
 idna==3.11
+PyYAML==6.0.3
 requests==2.32.5
 urllib3==2.5.0
 ```
@@ -51,10 +52,26 @@ chmod +x airflow_cli_trigger.py
 ```bash
 python airflow_cli_trigger.py \
     --url airflow.example.com \
-    --username <user_mail-id> \
+    --username <user> \
     --password <user_password> \
     --dag <dag_name> \
     --debug
+```
+
+### Using YAML Configuration
+
+Create a configuration file `dag_config.yaml`:
+```yaml
+url: https://airflow.example.com
+username: user
+password: my-password
+debug: false
+dag: dag_name
+```
+
+Run with:
+```bash
+python airflow_cli_trigger.py --config-file dag_config.yaml
 ```
 
 ## Configuration
@@ -69,6 +86,25 @@ python airflow_cli_trigger.py \
 | `--password` | No | Authentication password | `my-password` |
 | `--conf` | No | JSON string airflow DAG configurations | `'{"param1": value1, "param2": value2}'` |
 | `--debug` | No | Enable debug logging | Flag only |
+| `--config-file` | No | YAML configuration file path | `config/dag_config.yaml` |
+
+### YAML Configuration
+
+YAML files can contain all configuration options. CLI arguments override YAML values.
+
+#### Basic Structure
+```yaml
+url: https://airflow.example.com
+username: user
+password: my-password
+debug: false
+dag: dag_name
+
+# DAG configuration (as dictionary)
+conf:
+  param1: value1
+  param2: value2
+```
 
 ### Environment Variables
 
@@ -85,13 +121,18 @@ The tool supports multiple methods for password authentication, in order of prec
    python airflow_cli_trigger.py --password 'my-password' ...
    ```
 
-2. **Environment Variable**
+2. **YAML Configuration File**
+   ```yaml
+   password: my-password
+   ```
+
+3. **Environment Variable**
    ```bash
    export AIRFLOW_TRIGGER_PASSWORD='my-password'
    python airflow_cli_trigger.py ...
    ```
 
-3. **Interactive Prompt** (most secure)
+4. **Interactive Prompt** (most secure)
    ```
    Password for username: [hidden input]
    ```
