@@ -8,6 +8,7 @@ import time
 import logging
 import urllib3
 import getpass
+import yaml
 import os
 from datetime import datetime
 from urllib.parse import urljoin
@@ -123,12 +124,16 @@ class AirflowTriggerer:
 
             time.sleep(10)
 
-def get_password():
+def get_password(config, username):
     """Get password from environment variable, or prompt"""
-    # Check environment variable
-    password = os.environ.get('AIRFLOW_TRIGGER_PASSWORD')
-    if password:
-        logging.getLogger('airflow-trigger').debug("Using password from AIRFLOW_TRIGGER_PASSWORD environment variable")
+    # First check if password is in config
+    password = config.get('password')
+    
+    # Else check environment variable
+    if not password:
+        password = os.environ.get('AIRFLOW_TRIGGER_PASSWORD')
+        if password:
+            logging.getLogger('airflow-trigger').debug("Using password from AIRFLOW_TRIGGER_PASSWORD environment variable")
     
     # If still not found, prompt
     if not password:
@@ -136,25 +141,75 @@ def get_password():
     
     return password
 
+def load_yaml_config(config_file):
+    """Load configuration from YAML file."""
+    with open(config_file, 'r') as f:
+        return yaml.safe_load(f)
+
+def merge_configs(yaml_config, cli_args):
+    """Merge YAML config with CLI arguments. CLI arguments take precedence."""
+    merged = {}
+    
+    # Start with YAML config if provided
+    if yaml_config:
+        merged = yaml_config.copy()
+    
+    # Override with CLI arguments (only if they are explicitly provided)
+    cli_dict = vars(cli_args)
+    for key, value in cli_dict.items():
+        # Skip None values and special keys
+        if value is not None and key not in ['config_file', 'func']:
+            # For boolean flags, only override if True (explicitly set)
+            if isinstance(value, bool):
+                if value or key not in merged:
+                    merged[key] = value
+            else:
+                merged[key] = value
+    
+    return merged
+
 def main():
     parser = argparse.ArgumentParser(
         description='Trigger and monitor an Airflow DAG run',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    parser.add_argument('--url', required=True, help='Base URL of Airflow instance')
-    parser.add_argument('--dag', required=True, help='DAG ID to trigger')
-    parser.add_argument('--username', required=True, help='Airflow username')
+    parser.add_argument('--url', help='Base URL of Airflow instance')
+    parser.add_argument('--dag', help='DAG ID to trigger')
+    parser.add_argument('--username', help='Airflow username')
     parser.add_argument('--password', help='Airflow password')
     parser.add_argument('--conf', help='JSON string for DAG run configuration', default="{}")
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--config-file', help='YAML configuration file')
 
     args = parser.parse_args()
+
+    # Load YAML config if provided
+    yaml_config = None
+    if args.config_file:
+        try:
+            yaml_config = load_yaml_config(args.config_file)
+        except Exception as e:
+            print(f"Error loading config file: {e}")
+            sys.exit(1)
+    
+    # Merge configurations
+    config = merge_configs(yaml_config, args)
+
+    # Validate required fields
+    required_fields = ['url', 'dag', 'username']
+    missing_fields = [field for field in required_fields if field not in config or not config[field]]
+    if missing_fields:
+        print(f"Error: Missing required fields: {', '.join(missing_fields)}")
+        print("These must be provided either in the config file or as command-line arguments")
+        sys.exit(1)
+
     logger = setup_logger(args.debug)
 
-    # Ask for password if not provided
-    if not args.password:
-        args.password = get_password()
+    if args.config_file:
+        logger.info(f"Loaded configuration from: {args.config_file}")
+        
+    password = get_password(config, config['username'])
     
     try:
         conf_dict = json.loads(args.conf)
@@ -163,16 +218,16 @@ def main():
         sys.exit(1)
 
     triggerer = AirflowTriggerer(
-        airflow_url=args.url,
-        username=args.username,
-        password=args.password,
+        airflow_url=config['url'], 
+        username=config['username'], 
+        password=password, 
         logger=logger
     )
 
     try:
         # Trigger DAG and check its status on successful trigger
-        dag_run_id = triggerer.trigger_dag(args.dag, conf_dict)
-        final_state = triggerer.monitor_dag(args.dag, dag_run_id)
+        dag_run_id = triggerer.trigger_dag(config['dag'], conf_dict)
+        final_state = triggerer.monitor_dag(config['dag'], dag_run_id)
         
         if final_state == 'success':
             logger.info("DAG completed successfully!")
