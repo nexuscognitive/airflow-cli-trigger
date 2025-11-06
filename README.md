@@ -4,7 +4,7 @@ A powerful Python CLI tool to trigger and monitor the Airflow DAGs.
 ## Features
 
 - ✅ **Trigger Airflow DAGs** 
-- ✅ **Real-time joacb monitoring** with status updates and progress spinner
+- ✅ **Real-time DAG monitoring** with status updates and progress spinner
 - ✅ **Flexible authentication** with password from CLI, YAML, environment variable, or interactive prompt
 - ✅ **Configurable DAG properties** via CLI and YAML
 
