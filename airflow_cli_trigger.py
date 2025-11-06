@@ -66,8 +66,13 @@ class AirflowTriggerer:
         data = response.json()
         dag_run_id = data.get("dag_run_id", "N/A")
         state = data.get("state", "queued")
+
+        modified_dag_run_id = dag_run_id.replace(':', '%3A').replace('+', '%2B')
+        
+        dag_run_url = urljoin(self.airflow_url, f"/dags/{dag_id}/grid?dag_run_id={modified_dag_run_id}")
         
         self.logger.info(f"DAG triggered successfully! Run ID: {dag_run_id}, Initial state: {state}")
+        self.logger.info(f"DAG run URL: {dag_run_url}")
         return dag_run_id
 
     def get_dag_run_status(self, dag_id, dag_run_id):
@@ -86,7 +91,6 @@ class AirflowTriggerer:
         """Monitor DAG run until completion."""
         self.logger.info(f"Monitoring DAG run: {dag_run_id}")
         start_time = datetime.now()
-        dag_run_url = urljoin(self.airflow_url, f"/dags/{dag_id}/grid?dag_run_id={dag_run_id}")
         previous_state = None
         spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         spinner_idx = 0
@@ -111,7 +115,6 @@ class AirflowTriggerer:
                     self.logger.info(f"DAG reached terminal state: {state}")
                     elapsed_min, elapsed_sec = divmod(elapsed, 60)
                     self.logger.info(f"Total time: {elapsed_min}m {elapsed_sec}s")
-                    self.logger.info(f"DAG run URL: {dag_run_url}")
                     return state
 
                 if state != previous_state:
