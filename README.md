@@ -142,13 +142,13 @@ The tool supports multiple methods for password authentication, in order of prec
 ### Standard Output
 
 ```
-2025-11-05 20:09:20 - airflow-trigger - INFO - Triggering DAG: trigger_d
-2025-11-05 20:09:23 - airflow-trigger - INFO - DAG triggered successfully! Run ID: manual__2025-11-05T20:09:23.161858+00:00, Initial state: queued
-2025-11-05 20:09:23 - airflow-trigger - INFO - Monitoring DAG run: manual__2025-11-05T20:09:23.161858+00:00
-2025-11-05 20:09:23 - airflow-trigger - INFO - DAG state changed: queued        
-2025-11-05 20:09:33 - airflow-trigger - INFO - DAG state changed: running       
-2025-11-05 20:10:55 - airflow-trigger - INFO - DAG reached terminal state: success
-2025-11-05 20:10:55 - airflow-trigger - INFO - Total time: 1m 32s
-2025-11-05 20:10:55 - airflow-trigger - INFO - DAG run URL: https://airflow.rapid.nx1cloud.com/dags/trigger_d/grid?dag_run_id=manual__2025-11-05T20:09:23.161858+00:00
-2025-11-05 20:10:55 - airflow-trigger - INFO - DAG completed successfully!
+2025-11-06 16:34:41 - airflow-trigger - INFO - Triggering DAG: trigger_d
+2025-11-06 16:34:44 - airflow-trigger - INFO - DAG triggered successfully! Run ID: manual__2025-11-06T16:34:43.862096+00:00, Initial state: queued
+2025-11-06 16:34:44 - airflow-trigger - INFO - DAG run URL: https://airflow.rapid.nx1cloud.com/dags/trigger_d/grid?dag_run_id=manual__2025-11-06T16%3A34%3A43.862096%2B00%3A00
+2025-11-06 16:34:44 - airflow-trigger - INFO - Monitoring DAG run: manual__2025-11-06T16:34:43.862096+00:00
+2025-11-06 16:34:44 - airflow-trigger - INFO - DAG state changed: queued        
+2025-11-06 16:34:54 - airflow-trigger - INFO - DAG state changed: running       
+2025-11-06 16:37:36 - airflow-trigger - INFO - DAG reached terminal state: success
+2025-11-06 16:37:36 - airflow-trigger - INFO - Total time: 2m 52s
+2025-11-06 16:37:36 - airflow-trigger - INFO - DAG completed successfully!
 ```
