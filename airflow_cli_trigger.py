@@ -35,22 +35,122 @@ def setup_logger(debug=False):
     return logging.getLogger('airflow-trigger')
 
 class AirflowTriggerer:
-    def __init__(self, airflow_url, username, password, logger):
+    def __init__(self, airflow_url, username, password, logger, airflow_version=None):
         self.airflow_url = airflow_url.rstrip("/")
         self.username = username
         self.password = password
         self.logger = logger
         self.session = requests.Session()
-        self.session.auth = (username, password)
         self.session.verify = False
+        if airflow_version is None:
+            self.airflow_version = self._detect_airflow_version()
+        else:
+            self.airflow_version = airflow_version
+            
+        self.logger.info(f"Using Airflow version: {self.airflow_version}")
+        
+        # Set up authentication based on version
+        if self.airflow_version == 3:
+            self._setup_airflow3_auth()
+        else:
+            self._setup_airflow2_auth()
+
+    def _detect_airflow_version(self):
+        """
+        Auto-detect Airflow version by trying /v2/version endpoint with basic auth
+        """
+        self.logger.info("Auto-detecting Airflow version...")
+        
+        version_url = urljoin(self.airflow_url, "/api/v2/version")
+        
+        try:
+            # Try with basic auth first
+            response = requests.get(
+                version_url,
+                auth=(self.username, self.password),
+                verify=False,
+                timeout=10
+            )
+            
+            if response.status_code == 404:
+                # v2 API doesn't exist = Airflow 2
+                self.logger.info("Detected Airflow 2 (v2 API not found)")
+                return 2
+            elif response.status_code == 200:
+                # v2 API exists = Airflow 3
+                self.logger.info("Detected Airflow 3 (v2 API found)")
+                return 3
+            elif response.status_code == 401:
+                # v2 API exists but needs token → Airflow 3
+                self.logger.info("Detected Airflow 3 (v2 API found)")
+                return 3
+            else:
+                # Default to Airflow 2 for unexpected responses
+                self.logger.warning(f"Unexpected response code {response.status_code}, defaulting to Airflow 2")
+                return 2
+                
+        except Exception as e:
+            self.logger.warning(f"Error detecting version: {e}, defaulting to Airflow 2")
+            return 2
+    
+    def _setup_airflow2_auth(self):
+        """Setup authentication for Airflow 2 (Basic Auth)."""
+        self.session.auth = (self.username, self.password)
         self.headers = {
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
+        self.api_version = "v1"  # Use v1 API for Airflow 2
+    
+    def _setup_airflow3_auth(self):
+        """Setup authentication for Airflow 3 (Token-based Auth)."""
+        self.logger.info("Authenticating with Airflow 3...")
+        
+        # Get access token from /auth/token endpoint
+        token_url = urljoin(self.airflow_url, "/auth/token")
+        payload = {
+            "username": self.username,
+            "password": self.password
+        }
+        
+        try:
+            response = requests.post(
+                token_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                verify=False,
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.logger.error(f"Failed to authenticate with Airflow 3. HTTP {response.status_code}")
+                self.logger.error(response.text)
+                raise Exception(f"Authentication failed: {response.status_code}")
+            
+            token_data = response.json()
+            access_token = token_data.get("access_token")
+            
+            if not access_token:
+                raise Exception("No access token in response")
+            
+            # Set up session with Bearer token
+            self.session.auth = None  # Remove basic auth
+            self.headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": f"Bearer {access_token}"  # Add Bearer token
+            }
+            self.api_version = "v2"  # Use v2 API for Airflow 3
+            
+            self.logger.info("Successfully authenticated with Airflow 3")
+            
+        except Exception as e:
+            self.logger.error(f"Error during Airflow 3 authentication: {e}")
+            raise
 
     def trigger_dag(self, dag_id, conf=None):
         """Trigger a DAG run in Airflow."""
-        trigger_url = urljoin(self.airflow_url, f"/api/v1/dags/{dag_id}/dagRuns")
+        trigger_url = urljoin(self.airflow_url, f"/api/{self.api_version}/dags/{dag_id}/dagRuns")
         payload = {"conf": conf or {}}
 
         self.logger.info(f"Triggering DAG: {dag_id}")
@@ -77,7 +177,7 @@ class AirflowTriggerer:
 
     def get_dag_run_status(self, dag_id, dag_run_id):
         """Get status of the last DAG run."""
-        dag_run_url = urljoin(self.airflow_url, f"/api/v1/dags/{dag_id}/dagRuns/{dag_run_id}")
+        dag_run_url = urljoin(self.airflow_url, f"/api/{self.api_version}/dags/{dag_id}/dagRuns/{dag_run_id}")
         response = self.session.get(dag_run_url, headers=self.headers)
 
         if response.status_code != 200:
@@ -184,6 +284,8 @@ def main():
     parser.add_argument('--conf', help='JSON string for DAG run configuration', default="{}")
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--config-file', help='YAML configuration file')
+    parser.add_argument('--airflow-version', type=int, choices=[2, 3], 
+                       help='Airflow version (2 or 3). Auto-detects if not specified.')
 
     args = parser.parse_args()
 
@@ -220,11 +322,14 @@ def main():
         logger.error("Invalid JSON provided for --conf argument.")
         sys.exit(1)
 
+    airflow_version = config.get('airflow_version') or args.airflow_version
+
     triggerer = AirflowTriggerer(
         airflow_url=config['url'], 
         username=config['username'], 
         password=password, 
-        logger=logger
+        logger=logger,
+        airflow_version=airflow_version
     )
 
     try:
