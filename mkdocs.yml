@@ -1,0 +1,5 @@
+site_name: airflow-cli-trigger
+plugins:
+  - techdocs-core
+nav:
+  - Overview: README.md
