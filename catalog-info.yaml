@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: airflow-cli-trigger
+  description: Python CLI tool to trigger and monitor Airflow DAGs
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: nexuscognitive/airflow-cli-trigger
+  tags:
+    - python
+    - airflow
+    - cli
+spec:
+  type: tool
+  lifecycle: production
+  owner: nx1-platform-team
+  system: nx1-data-ops
