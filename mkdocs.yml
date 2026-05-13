@@ -1,6 +1,6 @@
 site_name: airflow-cli-trigger
-docs_dir: .
 plugins:
+  - include-markdown
   - techdocs-core
 nav:
-  - Overview: README.md
+  - Overview: index.md
